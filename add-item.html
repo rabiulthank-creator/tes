@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4D8GL6D');</script>
+  <!-- End Google Tag Manager -->
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add New Item | Indexly</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <style>
+    .form-section {
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background: rgba(255,255,255,0.5);
+      border-radius: 20px;
+    }
+    .form-section h3 {
+      margin-bottom: 1rem;
+      color: #0b4f6c;
+    }
+  </style>
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4D8GL6D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">🏥 Indexly</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="dashboard.html">Dashboard</a>
+      <button id="darkModeToggle" class="btn-outline">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container" style="padding:2rem 1rem; max-width:800px;">
+  <div class="glass-card" style="padding:2rem;">
+    <h2>➕ Add New Listing</h2>
+    <p style="color:#e65100; background:#fff3e0; padding:10px; border-radius:12px; margin:1rem 0;">⚠️ Your submission will be reviewed by admin before appearing publicly.</p>
+    
+    <div id="errorMessage" style="display:none; background:#ffebee; color:#c62828; padding:12px; border-radius:12px; margin-bottom:1rem;"></div>
+    <div id="successMessage" style="display:none; background:#e8f5e9; color:#2e7d32; padding:12px; border-radius:12px; margin-bottom:1rem;"></div>
+    
+    <form id="itemForm">
+      <div class="form-group">
+        <label>Category *</label>
+        <select id="categoryId" required>
+          <option value="">Select Category</option>
+        </select>
+      </div>
+      
+      <!-- Common Fields -->
+      <div class="form-section">
+        <h3>Basic Information</h3>
+        <div class="form-group"><label>Name / Title *</label><input type="text" id="name" placeholder="Enter name or title"></div>
+        <div class="form-group"><label>Description</label><textarea id="description" rows="3" placeholder="Describe your listing..."></textarea></div>
+        <div class="form-group"><label>Image URL</label><input type="text" id="image" placeholder="https://... (leave empty for default)"></div>
+        <div class="form-group"><label>City</label><input type="text" id="city" placeholder="City"></div>
+        <div class="form-group"><label>Phone</label><input type="tel" id="phone" placeholder="Phone number"></div>
+      </div>
+      
+      <!-- Doctor Specific -->
+      <div id="doctorFields" class="form-section" style="display:none;">
+        <h3>👨‍⚕️ Doctor Details</h3>
+        <div class="form-group"><label>Specialty</label><input type="text" id="specialty" placeholder="e.g., Cardiologist"></div>
+        <div class="form-group"><label>Experience (Years)</label><input type="number" id="experience" value="0"></div>
+        <div class="form-group"><label>Fee (₹)</label><input type="text" id="priceRange" placeholder="e.g., 1200"></div>
+      </div>
+      
+      <!-- Hotel/Restaurant Specific -->
+      <div id="hotelRestoFields" class="form-section" style="display:none;">
+        <h3>🏨 Hospitality Details</h3>
+        <div class="form-group"><label>Price Range</label><input type="text" id="priceRange" placeholder="e.g., ₹1000-₹5000"></div>
+        <div class="form-group"><label>Cuisine Type (Restaurant only)</label><input type="text" id="cuisineType" placeholder="e.g., Indian, Chinese"></div>
+      </div>
+      
+      <!-- News Specific -->
+      <div id="newsFields" class="form-section" style="display:none;">
+        <h3>📰 News Details</h3>
+        <div class="form-group"><label>News Title *</label><input type="text" id="newsTitle" placeholder="Enter news title"></div>
+        <div class="form-group"><label>News Source</label><input type="text" id="newsSource" placeholder="e.g., Times of India"></div>
+        <div class="form-group"><label>News URL</label><input type="url" id="newsUrl" placeholder="https://..."></div>
+      </div>
+      
+      <!-- Government Scheme Specific -->
+      <div id="schemeFields" class="form-section" style="display:none;">
+        <h3>🏛️ Government Scheme Details</h3>
+        <div class="form-group"><label>Scheme Name *</label><input type="text" id="schemeName" placeholder="Enter scheme name"></div>
+        <div class="form-group"><label>Eligibility</label><textarea id="eligibility" rows="2" placeholder="Who can apply?"></textarea></div>
+        <div class="form-group"><label>Apply Link</label><input type="url" id="applyLink" placeholder="https://..."></div>
+        <div class="form-group"><label>Deadline</label><input type="date" id="deadline"></div>
+      </div>
+      
+      <button type="submit" class="btn-primary" style="width:100%;">Submit for Approval →</button>
+    </form>
+    
+    <p style="text-align:center; margin-top:1rem;"><a href="dashboard.html">← Back to Dashboard</a></p>
+  </div>
+</div>
+
+<script>
+  let categories = [];
+  let selectedCategorySlug = '';
+  
+  async function loadCategories() {
+    const { data } = await supabaseClient.from('categories').select('*');
+    categories = data || [];
+    const select = document.getElementById('categoryId');
+    select.innerHTML = '<option value="">Select Category</option>' + 
+      categories.map(cat => `<option value="${cat.id}" data-slug="${cat.slug}">${cat.icon || '📌'} ${cat.name}</option>`).join('');
+  }
+  
+  document.getElementById('categoryId')?.addEventListener('change', (e) => {
+    const selected = categories.find(c => c.id == e.target.value);
+    selectedCategorySlug = selected?.slug;
+    
+    // Hide all category-specific fields
+    document.getElementById('doctorFields').style.display = 'none';
+    document.getElementById('hotelRestoFields').style.display = 'none';
+    document.getElementById('newsFields').style.display = 'none';
+    document.getElementById('schemeFields').style.display = 'none';
+    
+    if (selectedCategorySlug === 'doctor') {
+      document.getElementById('doctorFields').style.display = 'block';
+    } else if (selectedCategorySlug === 'hotel' || selectedCategorySlug === 'restaurant') {
+      document.getElementById('hotelRestoFields').style.display = 'block';
+    } else if (selectedCategorySlug === 'trending-news') {
+      document.getElementById('newsFields').style.display = 'block';
+    } else if (selectedCategorySlug === 'government-scheme') {
+      document.getElementById('schemeFields').style.display = 'block';
+    }
+  });
+  
+  function generateSlug(text) {
+    if (!text) return 'item-' + Date.now();
+    return text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/--+/g, '-').replace(/^-+|-+$/g, '') + '-' + Date.now();
+  }
+  
+  function showMessage(message, isError = true) {
+    const errorDiv = document.getElementById('errorMessage');
+    const successDiv = document.getElementById('successMessage');
+    if (isError) {
+      errorDiv.innerText = message;
+      errorDiv.style.display = 'block';
+      setTimeout(() => errorDiv.style.display = 'none', 5000);
+    } else {
+      successDiv.innerText = message;
+      successDiv.style.display = 'block';
+      setTimeout(() => successDiv.style.display = 'none', 5000);
+    }
+  }
+  
+  async function checkAuth() { 
+    const { data: { user } } = await supabaseClient.auth.getUser(); 
+    if(!user) window.location.href = 'login.html'; 
+    return user; 
+  }
+  
+  document.getElementById('itemForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const user = await checkAuth();
+    
+    const categoryId = document.getElementById('categoryId').value;
+    if (!categoryId) {
+      showMessage('Please select a category');
+      return;
+    }
+    
+    const selectedCat = categories.find(c => c.id == categoryId);
+    const name = document.getElementById('name').value.trim();
+    const description = document.getElementById('description').value.trim();
+    const image = document.getElementById('image').value.trim() || 'https://randomuser.me/api/portraits/med.jpg';
+    const city = document.getElementById('city').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    
+    let slug = name ? generateSlug(name) : 'item-' + Date.now();
+    
+    let itemData = {
+      category_id: parseInt(categoryId),
+      name: name || null,
+      slug: slug,
+      description: description || null,
+      image: image,
+      city: city || null,
+      phone: phone || null,
+      approved: false,
+      email: user.email,
+      created_at: new Date()
+    };
+    
+    // Doctor fields
+    if (selectedCat.slug === 'doctor') {
+      const specialty = document.getElementById('specialty').value;
+      const experience = parseInt(document.getElementById('experience').value) || 0;
+      const priceRange = document.getElementById('priceRange').value;
+      
+      if (!name) {
+        showMessage('Please enter doctor name');
+        return;
+      }
+      itemData.specialty = specialty || null;
+      itemData.experience_years = experience;
+      itemData.price_range = priceRange || null;
+    }
+    // Hotel/Restaurant fields
+    else if (selectedCat.slug === 'hotel' || selectedCat.slug === 'restaurant') {
+      const priceRange = document.getElementById('priceRange').value;
+      if (!name) {
+        showMessage('Please enter name');
+        return;
+      }
+      itemData.price_range = priceRange || null;
+      if (selectedCat.slug === 'restaurant') {
+        itemData.cuisine_type = document.getElementById('cuisineType').value || null;
+      }
+    }
+    // News fields
+    else if (selectedCat.slug === 'trending-news') {
+      const newsTitle = document.getElementById('newsTitle').value.trim();
+      const newsSource = document.getElementById('newsSource').value.trim();
+      const newsUrl = document.getElementById('newsUrl').value.trim();
+      
+      if (!newsTitle) {
+        showMessage('Please enter news title');
+        return;
+      }
+      itemData.news_title = newsTitle;
+      itemData.news_source = newsSource || null;
+      itemData.news_url = newsUrl || null;
+      itemData.name = newsTitle; // Also set name for display
+    }
+    // Government Scheme fields
+    else if (selectedCat.slug === 'government-scheme') {
+      const schemeName = document.getElementById('schemeName').value.trim();
+      const eligibility = document.getElementById('eligibility').value.trim();
+      const applyLink = document.getElementById('applyLink').value.trim();
+      const deadline = document.getElementById('deadline').value;
+      
+      if (!schemeName) {
+        showMessage('Please enter scheme name');
+        return;
+      }
+      itemData.scheme_name = schemeName;
+      itemData.eligibility = eligibility || null;
+      itemData.apply_link = applyLink || null;
+      itemData.deadline = deadline || null;
+      itemData.name = schemeName; // Also set name for display
+    }
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.innerText = 'Submitting...';
+    submitBtn.disabled = true;
+    
+    const { error } = await supabaseClient.from('items').insert(itemData);
+    if (error) {
+      showMessage('Error: ' + error.message);
+      submitBtn.innerText = 'Submit for Approval →';
+      submitBtn.disabled = false;
+    } else {
+      showMessage('✅ Item submitted successfully! Admin will review.', false);
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 2000);
+    }
+  });
+  
+  document.getElementById('darkModeToggle')?.addEventListener('click', () => document.body.classList.toggle('dark'));
+  
+  loadCategories();
+  checkAuth();
+</script>
+</body>
+</html>

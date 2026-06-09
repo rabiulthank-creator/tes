@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4D8GL6D');</script>
+  <!-- End Google Tag Manager -->
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Dashboard | Indexly</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4D8GL6D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">🏥 Indexly</div>
+    <div class="menu-icon" id="menuIcon">☰</div>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="category.html?cat=doctor">Doctors</a>
+      <a href="category.html?cat=hotel">Hotels</a>
+      <a href="category.html?cat=restaurant">Restaurants</a>
+      <a href="category.html?cat=trending-news">News</a>
+      <a href="category.html?cat=government-scheme">Schemes</a>
+      <a href="#" id="logoutBtn">Logout</a>
+      <button id="darkModeToggle" class="btn-outline">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<div class="dashboard-container">
+  <div class="sidebar">
+    <a href="#" class="active" onclick="showSection('myItems')">📦 My Listings</a>
+    <a href="#" onclick="showSection('bookings')">📅 My Bookings</a>
+    <a href="#" onclick="showSection('profile')">👤 My Profile</a>
+  </div>
+  <div class="main-content">
+    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+      <a href="add-item.html" class="btn-primary">➕ Add New Listing</a>
+    </div>
+    
+    <div id="myItemsSection"><h2>📦 My Listings</h2><div id="myItemsList" class="glass-card" style="padding:1.5rem;">Loading...</div></div>
+    <div id="bookingsSection" style="display:none;"><h2>📅 My Bookings</h2><div id="bookingsList" class="glass-card" style="padding:1.5rem;">Loading...</div></div>
+    <div id="profileSection" style="display:none;"><h2>👤 My Profile</h2><div class="glass-card" style="padding:2rem;"><p><strong>Name:</strong> <span id="userName"></span></p><p><strong>Email:</strong> <span id="userEmail"></span></p><p><strong>Member since:</strong> <span id="userSince"></span></p><button onclick="logout()" class="btn-danger">Logout</button></div></div>
+  </div>
+</div>
+
+<script>
+  let currentUser = null;
+  
+  async function checkAuthAndLoad() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if(!user) { window.location.href = 'login.html'; return; }
+    currentUser = user;
+    document.getElementById('userName').innerText = user.user_metadata?.full_name || user.email;
+    document.getElementById('userEmail').innerText = user.email;
+    document.getElementById('userSince').innerText = new Date(user.created_at).toLocaleDateString();
+    loadMyItems();
+    loadMyBookings();
+  }
+  
+  async function loadMyItems() {
+    const { data } = await supabaseClient.from('items').select('*, categories(name, icon)').eq('email', currentUser.email).order('created_at', { ascending: false });
+    const container = document.getElementById('myItemsList');
+    if(!data || data.length === 0) { container.innerHTML = '<p>No listings added yet.</p><a href="add-item.html" class="btn-primary">➕ Add Your First Listing</a>'; return; }
+    container.innerHTML = data.map(item => `
+      <div class="glass-card" style="margin-bottom:1rem; padding:1rem;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+          <div>
+            <h3>${item.categories?.icon || '📌'} ${item.name || item.news_title || item.scheme_name}</h3>
+            <p>${item.categories?.name || 'Unknown'} • ${item.city || 'N/A'}</p>
+            ${item.approved ? '<p style="color:green;">✅ Approved</p>' : '<p style="color:orange;">⏳ Pending Approval</p>'}
+          </div>
+          <div>
+            ${item.approved && (item.categories?.slug !== 'trending-news' && item.categories?.slug !== 'government-scheme') ? `<a href="item-details.html?id=${item.id}" class="btn-outline">View</a>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  async function loadMyBookings() {
+    const { data } = await supabaseClient.from('bookings').select('*, items(name, categories(name))').eq('user_id', currentUser.id).order('booking_date', { ascending: true });
+    const container = document.getElementById('bookingsList');
+    if(!data || data.length === 0) { container.innerHTML = '<p>No bookings yet.</p>'; return; }
+    container.innerHTML = data.map(b => `
+      <div class="glass-card" style="margin-bottom:1rem; padding:1rem;">
+        <h3>${b.items?.name || 'Item'}</h3>
+        <p>${b.items?.categories?.name || 'Service'}</p>
+        <p>📅 ${new Date(b.booking_date).toLocaleString()}</p>
+        <span style="background:${b.status === 'confirmed' ? '#4caf50' : '#ff9800'}; color:white; padding:4px 12px; border-radius:20px;">${b.status || 'pending'}</span>
+      </div>
+    `).join('');
+  }
+  
+  window.showSection = (section) => {
+    document.getElementById('myItemsSection').style.display = section === 'myItems' ? 'block' : 'none';
+    document.getElementById('bookingsSection').style.display = section === 'bookings' ? 'block' : 'none';
+    document.getElementById('profileSection').style.display = section === 'profile' ? 'block' : 'none';
+  };
+  
+  window.logout = async () => { await supabaseClient.auth.signOut(); window.location.href = 'index.html'; };
+  
+  document.getElementById('darkModeToggle')?.addEventListener('click', () => document.body.classList.toggle('dark'));
+  document.getElementById('menuIcon')?.addEventListener('click', () => document.getElementById('navLinks').classList.toggle('active'));
+  document.getElementById('logoutBtn')?.addEventListener('click', logout);
+  checkAuthAndLoad();
+</script>
+</body>
+</html>

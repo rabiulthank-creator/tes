@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4D8GL6D');</script>
+  <!-- End Google Tag Manager -->
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Item Details | Indexly</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <style>
+    .details-container { max-width: 1000px; margin: 0 auto; }
+    .details-image { width: 100%; max-height: 400px; object-fit: cover; border-radius: 30px; }
+    .details-header { display: flex; flex-wrap: wrap; gap: 2rem; margin-bottom: 2rem; }
+    .details-info { flex: 1; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .info-item { display: flex; align-items: center; gap: 10px; padding: 8px; background: rgba(255,255,255,0.5); border-radius: 16px; }
+    .info-icon { font-size: 1.3rem; min-width: 35px; }
+    .call-btn { background: #25D366; color: white; padding: 14px 32px; border: none; border-radius: 50px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; font-size: 1.1rem; transition: 0.2s; }
+    .call-btn:hover { transform: scale(1.02); }
+    .apply-btn { background: #ff6b35; color: white; padding: 12px 28px; border: none; border-radius: 40px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+    .loading { text-align: center; padding: 3rem; }
+    .error-message { text-align: center; padding: 3rem; color: #c62828; }
+    .reviews-section { margin-top: 2rem; }
+    .review-card { padding: 1rem; margin-bottom: 1rem; border-radius: 20px; background: rgba(255,255,255,0.5); }
+    .rating-star { color: #f5a623; }
+    .phone-number-card { background: linear-gradient(135deg, #0b4f6c, #2ba0c4); color: white; padding: 15px 20px; border-radius: 60px; display: inline-flex; align-items: center; gap: 15px; margin-top: 1rem; }
+    .phone-number-card .phone-icon { font-size: 1.8rem; }
+    .phone-number-card .number { font-size: 1.3rem; font-weight: bold; }
+    @media (max-width: 768px) { .details-header { flex-direction: column; } .phone-number-card { flex-direction: column; text-align: center; } }
+  </style>
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4D8GL6D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">🏥 Indexly</div>
+    <div class="menu-icon" id="menuIcon">☰</div>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="category.html?type=doctor">Doctors</a>
+      <a href="category.html?type=hotel">Hotels</a>
+      <a href="category.html?type=restaurant">Restaurants</a>
+      <a href="category.html?type=news">News</a>
+      <a href="category.html?type=scheme">Schemes</a>
+      <a href="login.html" id="loginNavBtn" class="btn-outline">Login</a>
+      <a href="dashboard.html" id="dashboardNavBtn" style="display:none;">Dashboard</a>
+      <button id="darkModeToggle" class="btn-outline">🌙</button>
+      <a href="#" id="logoutBtn" style="display:none;">Logout</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container" style="padding: 2rem 1rem;">
+  <div id="detailsContainer" class="details-container">
+    <div class="loading">🔄 Loading details...</div>
+  </div>
+</main>
+
+<script>
+  let currentItem = null;
+  let currentType = '';
+  let currentTable = '';
+  
+  function getQueryParams() {
+    const params = new URLSearchParams(window.location.search);
+    return { type: params.get('type'), id: params.get('id') };
+  }
+  
+  const tableMap = {
+    doctor: 'doctors',
+    hotel: 'hotels',
+    restaurant: 'restaurants',
+    news: 'trending_news',
+    scheme: 'government_schemes'
+  };
+  
+  async function loadDetails() {
+    const { type, id } = getQueryParams();
+    const container = document.getElementById('detailsContainer');
+    
+    console.log('Loading details for type:', type, 'id:', id);
+    
+    if (!type || !id) {
+      container.innerHTML = `
+        <div class="error-message">
+          ❌ Invalid request. Missing type or ID.<br><br>
+          <a href="index.html" class="btn-primary">Go to Homepage</a>
+        </div>`;
+      return;
+    }
+    
+    currentType = type;
+    currentTable = tableMap[type];
+    
+    if (!currentTable) {
+      container.innerHTML = `
+        <div class="error-message">
+          ❌ Invalid category type: ${type}<br><br>
+          <a href="index.html" class="btn-primary">Go to Homepage</a>
+        </div>`;
+      return;
+    }
+    
+    container.innerHTML = '<div class="loading">🔄 Loading details...</div>';
+    
+    try {
+      const { data, error } = await supabaseClient
+        .from(currentTable)
+        .select('*')
+        .eq('id', parseInt(id))
+        .single();
+      
+      if (error || !data) {
+        container.innerHTML = `<div class="error-message">❌ Item not found. ${error?.message || ''}</div>`;
+        return;
+      }
+      
+      currentItem = data;
+      renderDetails(data, type);
+      document.title = `${data.name || data.title || 'Details'} | Indexly`;
+      loadReviews(type, data.id);
+      
+    } catch (err) {
+      container.innerHTML = `<div class="error-message">❌ Error: ${err.message}</div>`;
+    }
+  }
+  
+  function renderDetails(item, type) {
+    const container = document.getElementById('detailsContainer');
+    
+    if (type === 'doctor') {
+      container.innerHTML = renderDoctorDetails(item);
+    } 
+    else if (type === 'hotel') {
+      container.innerHTML = renderHotelDetails(item);
+    }
+    else if (type === 'restaurant') {
+      container.innerHTML = renderRestaurantDetails(item);
+    }
+    else if (type === 'news') {
+      container.innerHTML = renderNewsDetails(item);
+    }
+    else if (type === 'scheme') {
+      container.innerHTML = renderSchemeDetails(item);
+    }
+  }
+  
+  function formatPhoneNumber(phone) {
+    if (!phone) return null;
+    const cleaned = phone.toString().replace(/\D/g, '');
+    return cleaned.length === 10 ? cleaned : cleaned;
+  }
+  
+  function renderPhoneButton(phone) {
+    if (!phone) return '';
+    const formattedPhone = formatPhoneNumber(phone);
+    if (!formattedPhone) return '';
+    
+    return `
+      <div style="margin-top: 1.5rem;">
+        <div class="phone-number-card">
+          <span class="phone-icon">📞</span>
+          <span class="number">${phone}</span>
+        </div>
+        <a href="tel:${formattedPhone}" class="call-btn" style="margin-top: 1rem;">
+          📞 Call Now
+        </a>
+      </div>
+    `;
+  }
+  
+  function renderDoctorDetails(doc) {
+    return `
+      <div class="glass-card" style="padding: 2rem;">
+        <div class="details-header">
+          <img src="${doc.image || 'https://randomuser.me/api/portraits/med.jpg'}" class="details-image" style="max-width: 300px;" alt="${doc.name}">
+          <div class="details-info">
+            <h1>Dr. ${doc.name}</h1>
+            <p style="font-size: 1.2rem; color: #2ba0c4;">${doc.specialty || 'General Physician'}</p>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-icon">⭐</span> <span>${doc.rating || '4.5'} / 5</span></div>
+              <div class="info-item"><span class="info-icon">📅</span> <span>${doc.experience || 0}+ years experience</span></div>
+              <div class="info-item"><span class="info-icon">🏥</span> <span>${doc.hospital || 'Private Practice'}</span></div>
+              <div class="info-item"><span class="info-icon">📍</span> <span>${doc.city || 'Multiple Locations'}</span></div>
+              <div class="info-item"><span class="info-icon">💰</span> <span>₹${doc.fees || 500} per consultation</span></div>
+            </div>
+            ${renderPhoneButton(doc.phone)}
+          </div>
+        </div>
+        ${doc.about ? `<div style="margin-top: 2rem;"><h3>📋 About Doctor</h3><p>${doc.about}</p></div>` : ''}
+        <div style="margin-top: 2rem;"><h3>🎓 Qualifications</h3><ul><li>MBBS - Recognized Medical College</li><li>MD - ${doc.specialty || 'Medicine'}</li></ul></div>
+        <div style="margin-top: 2rem;"><h3>🕐 Consultation Timings</h3><p>Monday - Saturday: 10:00 AM - 6:00 PM</p><p>Sunday: Closed</p></div>
+        <div id="reviewsContainer" class="reviews-section"><h3>⭐ Patient Reviews</h3><div id="reviewsList">Loading reviews...</div>
+        <div style="margin-top: 1.5rem;"><h4>Write a Review</h4><textarea id="reviewText" rows="3" style="width:100%; border-radius:16px; padding:12px;"></textarea><select id="reviewRating" style="margin-top:8px; padding:8px;"><option value="5">⭐⭐⭐⭐⭐ Excellent</option><option value="4">⭐⭐⭐⭐ Good</option><option value="3">⭐⭐⭐ Average</option><option value="2">⭐⭐ Poor</option><option value="1">⭐ Very Poor</option></select><button onclick="submitReview()" class="btn-primary" style="margin-top:8px;">Submit Review</button></div></div>
+      </div>
+    `;
+  }
+  
+  function renderHotelDetails(hotel) {
+    return `
+      <div class="glass-card" style="padding: 2rem;">
+        <div class="details-header">
+          <img src="${hotel.image || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600'}" class="details-image" style="max-width: 300px;" alt="${hotel.name}">
+          <div class="details-info">
+            <h1>🏨 ${hotel.name}</h1>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-icon">⭐</span> <span>${hotel.rating || 'New'} / 5</span></div>
+              <div class="info-item"><span class="info-icon">📍</span> <span>${hotel.city || 'N/A'}</span></div>
+              <div class="info-item"><span class="info-icon">💰</span> <span>${hotel.price_range || 'Contact for price'}</span></div>
+            </div>
+            ${renderPhoneButton(hotel.phone)}
+          </div>
+        </div>
+        <div id="reviewsContainer" class="reviews-section"><h3>⭐ Guest Reviews</h3><div id="reviewsList">Loading reviews...</div>
+        <div style="margin-top: 1.5rem;"><h4>Write a Review</h4><textarea id="reviewText" rows="3" style="width:100%; border-radius:16px; padding:12px;"></textarea><select id="reviewRating" style="margin-top:8px; padding:8px;"><option value="5">⭐⭐⭐⭐⭐ Excellent</option><option value="4">⭐⭐⭐⭐ Good</option><option value="3">⭐⭐⭐ Average</option><option value="2">⭐⭐ Poor</option><option value="1">⭐ Very Poor</option></select><button onclick="submitReview()" class="btn-primary" style="margin-top:8px;">Submit Review</button></div></div>
+      </div>
+    `;
+  }
+  
+  function renderRestaurantDetails(restaurant) {
+    return `
+      <div class="glass-card" style="padding: 2rem;">
+        <div class="details-header">
+          <img src="${restaurant.image || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600'}" class="details-image" style="max-width: 300px;" alt="${restaurant.name}">
+          <div class="details-info">
+            <h1>🍽️ ${restaurant.name}</h1>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-icon">⭐</span> <span>${restaurant.rating || 'New'} / 5</span></div>
+              <div class="info-item"><span class="info-icon">🍴</span> <span>${restaurant.cuisine_type || 'Multi-cuisine'}</span></div>
+              <div class="info-item"><span class="info-icon">📍</span> <span>${restaurant.city || 'N/A'}</span></div>
+            </div>
+            ${renderPhoneButton(restaurant.phone)}
+          </div>
+        </div>
+        <div id="reviewsContainer" class="reviews-section"><h3>⭐ Customer Reviews</h3><div id="reviewsList">Loading reviews...</div>
+        <div style="margin-top: 1.5rem;"><h4>Write a Review</h4><textarea id="reviewText" rows="3" style="width:100%; border-radius:16px; padding:12px;"></textarea><select id="reviewRating" style="margin-top:8px; padding:8px;"><option value="5">⭐⭐⭐⭐⭐ Excellent</option><option value="4">⭐⭐⭐⭐ Good</option><option value="3">⭐⭐⭐ Average</option><option value="2">⭐⭐ Poor</option><option value="1">⭐ Very Poor</option></select><button onclick="submitReview()" class="btn-primary" style="margin-top:8px;">Submit Review</button></div></div>
+      </div>
+    `;
+  }
+  
+  function renderNewsDetails(news) {
+    return `
+      <div class="glass-card" style="padding: 2rem;">
+        <div class="details-header">
+          <div class="details-info">
+            <h1>📰 ${news.title}</h1>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-icon">📡</span> <span>Source: ${news.source || 'Unknown'}</span></div>
+              <div class="info-item"><span class="info-icon">📅</span> <span>Published: ${new Date(news.published_date || news.created_at).toLocaleDateString()}</span></div>
+            </div>
+            <div style="margin-top: 1.5rem;">
+              <a href="${news.news_url || '#'}" target="_blank" class="apply-btn">Read Full Article →</a>
+            </div>
+          </div>
+        </div>
+        ${news.summary ? `<div style="margin-top: 2rem;"><h3>📋 Summary</h3><p>${news.summary}</p></div>` : ''}
+      </div>
+    `;
+  }
+  
+  function renderSchemeDetails(scheme) {
+    return `
+      <div class="glass-card" style="padding: 2rem;">
+        <div class="details-header">
+          <div class="details-info">
+            <h1>🏛️ ${scheme.name}</h1>
+            <div class="info-grid">
+              <div class="info-item"><span class="info-icon">👥</span> <span>Eligibility: ${scheme.eligibility || 'Check details'}</span></div>
+              <div class="info-item"><span class="info-icon">📅</span> <span>Deadline: ${scheme.deadline ? new Date(scheme.deadline).toLocaleDateString() : 'Not specified'}</span></div>
+            </div>
+            <div style="margin-top: 1.5rem;">
+              <a href="${scheme.apply_link || '#'}" target="_blank" class="apply-btn">Apply Now →</a>
+            </div>
+          </div>
+        </div>
+        ${scheme.description ? `<div style="margin-top: 2rem;"><h3>📋 Description</h3><p>${scheme.description}</p></div>` : ''}
+      </div>
+    `;
+  }
+  
+  async function loadReviews(type, itemId) {
+    const { data, error } = await supabaseClient
+      .from('reviews')
+      .select('*')
+      .eq('item_type', type)
+      .eq('item_id', itemId)
+      .order('created_at', { ascending: false });
+    
+    const reviewsDiv = document.getElementById('reviewsList');
+    if (!reviewsDiv) return;
+    
+    if (error || !data || data.length === 0) {
+      reviewsDiv.innerHTML = '<p>No reviews yet. Be the first to review!</p>';
+      return;
+    }
+    
+    reviewsDiv.innerHTML = data.map(review => `
+      <div class="review-card">
+        <div style="display: flex; justify-content: space-between;">
+          <strong>${review.user_name}</strong>
+          <span class="rating-star">${'⭐'.repeat(review.rating)}</span>
+        </div>
+        <p style="margin-top: 8px;">${review.comment}</p>
+        <small>${new Date(review.created_at).toLocaleDateString()}</small>
+      </div>
+    `).join('');
+  }
+  
+  window.submitReview = async () => {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) { alert('Please login to submit a review'); window.location.href = 'login.html'; return; }
+    
+    const reviewText = document.getElementById('reviewText')?.value;
+    const rating = document.getElementById('reviewRating')?.value;
+    
+    if (!reviewText) { alert('Please write a review'); return; }
+    
+    const { error } = await supabaseClient.from('reviews').insert({
+      item_type: currentType,
+      item_id: currentItem.id,
+      user_id: user.id,
+      user_name: user.email.split('@')[0],
+      rating: parseInt(rating),
+      comment: reviewText,
+      created_at: new Date()
+    });
+    
+    if (error) alert('Error: ' + error.message);
+    else { alert('Review submitted!'); document.getElementById('reviewText').value = ''; loadReviews(currentType, currentItem.id); }
+  };
+  
+  async function checkAuth() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const loginBtn = document.getElementById('loginNavBtn');
+    const dashboardBtn = document.getElementById('dashboardNavBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if(user) { if(loginBtn) loginBtn.style.display = 'none'; if(dashboardBtn) dashboardBtn.style.display = 'inline-block'; if(logoutBtn) logoutBtn.style.display = 'inline-block'; }
+    else { if(loginBtn) loginBtn.style.display = 'inline-block'; if(dashboardBtn) dashboardBtn.style.display = 'none'; if(logoutBtn) logoutBtn.style.display = 'none'; }
+  }
+  checkAuth();
+  
+  document.getElementById('logoutBtn')?.addEventListener('click', async (e) => { e.preventDefault(); await supabaseClient.auth.signOut(); window.location.reload(); });
+  document.getElementById('menuIcon')?.addEventListener('click', () => document.getElementById('navLinks').classList.toggle('active'));
+  document.getElementById('darkModeToggle')?.addEventListener('click', () => document.body.classList.toggle('dark'));
+  
+  loadDetails();
+</script>
+</body>
+</html>

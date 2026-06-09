@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4D8GL6D');</script>
+  <!-- End Google Tag Manager -->
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Find Doctors | Indexly</title>
+  <meta name="description" content="Search and filter doctors by specialty, city, experience, and fees. Book instant appointments.">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <style>
+    .specialty-filter-section { margin-bottom: 1.5rem; }
+    .specialty-search-box { width: 100%; padding: 12px 20px; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; margin-bottom: 0.5rem; }
+    .specialty-search-box:focus { outline: none; border-color: #2ba0c4; box-shadow: 0 0 0 3px rgba(43,160,196,0.2); }
+    .specialty-buttons-container { max-height: 0; opacity: 0; overflow-y: hidden; transition: all 0.3s ease; }
+    .specialty-buttons-container.visible { max-height: 250px; opacity: 1; overflow-y: auto; margin-top: 1rem; }
+    .specialty-buttons { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; background: rgba(255,255,255,0.5); border-radius: 20px; }
+    .specialty-btn { background: #f0f0f0; border: none; padding: 8px 20px; border-radius: 40px; cursor: pointer; font-size: 0.9rem; transition: 0.2s; }
+    .specialty-btn:hover { background: #2ba0c4; color: white; }
+    .specialty-btn.active { background: #2ba0c4; color: white; }
+    .selected-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
+    .filter-tag { background: #2ba0c4; color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; }
+    .filter-tag .remove { cursor: pointer; font-weight: bold; }
+    .info-text { font-size: 0.8rem; color: #666; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4D8GL6D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">🏥 Indexly</div>
+    <div class="menu-icon" id="menuIcon">☰</div>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="doctors.html">Doctors</a>
+      <a href="login.html" id="loginNavBtn" class="btn-outline">Login</a>
+      <a href="dashboard.html" id="dashboardNavBtn" style="display:none;">Dashboard</a>
+      <button id="darkModeToggle" class="btn-outline">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container" style="padding: 2rem 1rem;">
+  <h1 style="margin-bottom: 2rem;">👨‍⚕️ Find Your Doctor</h1>
+  
+  <div class="filters-section">
+    <div class="filter-group">
+      <input type="text" id="searchInput" placeholder="🔍 Search by doctor name" style="flex:2;">
+      <select id="cityFilter">
+        <option value="">All Cities</option>
+        <option>Kolkata</option><option>Delhi</option><option>Mumbai</option>
+        <option>Bangalore</option><option>Chennai</option><option>Hyderabad</option>
+      </select>
+      <button id="resetBtn" class="btn-outline">Reset</button>
+    </div>
+
+    <div class="specialty-filter-section">
+      <input type="text" id="specialtySearch" class="specialty-search-box" 
+             placeholder="🔍 Type to search specialties (e.g., 'cardio' for Cardiologist)..."
+             autocomplete="off">
+      <div class="info-text">💡 Start typing to see matching specialties</div>
+      
+      <div id="specialtyButtonsContainer" class="specialty-buttons-container">
+        <div id="specialtyButtons" class="specialty-buttons"></div>
+      </div>
+    </div>
+
+    <div id="selectedFilters" class="selected-filters"></div>
+  </div>
+  
+  <div id="doctorsContainer" class="doctor-grid grid-4">
+    <div class="skeleton-card"></div><div class="skeleton-card"></div>
+    <div class="skeleton-card"></div><div class="skeleton-card"></div>
+  </div>
+</main>
+
+<footer style="margin-top: 4rem;">
+  <div class="container" style="text-align: center;">© 2026 Indexly — Book with confidence</div>
+</footer>
+
+<script>
+  const doctorsContainer = document.getElementById('doctorsContainer');
+  const searchInput = document.getElementById('searchInput');
+  const cityFilter = document.getElementById('cityFilter');
+  const specialtySearch = document.getElementById('specialtySearch');
+  const specialtyButtonsContainer = document.getElementById('specialtyButtonsContainer');
+  const specialtyButtonsDiv = document.getElementById('specialtyButtons');
+  const selectedFiltersDiv = document.getElementById('selectedFilters');
+  const resetBtn = document.getElementById('resetBtn');
+  
+  let allDoctors = [];
+  let allSpecialties = [];
+  let selectedSpecialty = '';
+  
+  const fullSpecialtiesList = [
+    'Cardiologist', 'Dentist', 'Neurologist', 'Orthopedic', 
+    'Gynecologist', 'Pediatrician', 'Dermatologist', 'Ophthalmologist',
+    'Psychiatrist', 'Radiologist', 'Urologist', 'Gastroenterologist',
+    'Endocrinologist', 'Nephrologist', 'Pulmonologist', 'Rheumatologist',
+    'Oncologist', 'Hematologist', 'Allergist', 'Infectious Disease',
+    'Plastic Surgeon', 'Neurosurgeon', 'ENT Specialist', 'General Physician'
+  ];
+  
+  async function loadSpecialties() {
+    const { data } = await supabaseClient
+      .from('doctors')
+      .select('specialty')
+      .eq('approved', true);
+    
+    const doctorSpecialties = [...new Set(data?.map(d => d.specialty).filter(Boolean) || [])];
+    allSpecialties = [...new Set([...fullSpecialtiesList, ...doctorSpecialties])].sort();
+  }
+  
+  function filterAndDisplaySpecialties() {
+    const searchTerm = specialtySearch.value.toLowerCase().trim();
+    
+    if (!searchTerm) {
+      specialtyButtonsContainer.classList.remove('visible');
+      specialtyButtonsDiv.innerHTML = '';
+      return;
+    }
+    
+    const filtered = allSpecialties.filter(specialty => specialty.toLowerCase().includes(searchTerm));
+    
+    if (filtered.length === 0) {
+      specialtyButtonsDiv.innerHTML = '<div style="padding: 10px; text-align: center; width: 100%; color: #666;">No matching specialties found</div>';
+      specialtyButtonsContainer.classList.add('visible');
+      return;
+    }
+    
+    specialtyButtonsContainer.classList.add('visible');
+    specialtyButtonsDiv.innerHTML = filtered.map(specialty => `
+      <button class="specialty-btn ${selectedSpecialty === specialty ? 'active' : ''}" 
+              onclick="selectSpecialty('${specialty.replace(/'/g, "\\'")}')">
+        ${specialty}
+      </button>
+    `).join('');
+  }
+  
+  window.selectSpecialty = (specialty) => {
+    if (selectedSpecialty === specialty) {
+      selectedSpecialty = '';
+    } else {
+      selectedSpecialty = specialty;
+    }
+    
+    document.querySelectorAll('.specialty-btn').forEach(btn => {
+      if (btn.innerText === selectedSpecialty) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    
+    updateSelectedFiltersDisplay();
+    filterDoctors();
+  };
+  
+  function updateSelectedFiltersDisplay() {
+    const filters = [];
+    if (selectedSpecialty) filters.push(`<span class="filter-tag">📋 ${selectedSpecialty} <span class="remove" onclick="selectSpecialty('${selectedSpecialty}')">✕</span></span>`);
+    if (cityFilter.value) filters.push(`<span class="filter-tag">📍 ${cityFilter.value} <span class="remove" onclick="clearCityFilter()">✕</span></span>`);
+    if (searchInput.value) filters.push(`<span class="filter-tag">🔍 "${searchInput.value}" <span class="remove" onclick="clearSearchFilter()">✕</span></span>`);
+    selectedFiltersDiv.innerHTML = filters.length > 0 ? filters.join('') : '<span style="color: #666; font-size: 0.85rem;">No active filters</span>';
+  }
+  
+  window.clearCityFilter = () => { cityFilter.value = ''; updateSelectedFiltersDisplay(); filterDoctors(); };
+  window.clearSearchFilter = () => { searchInput.value = ''; updateSelectedFiltersDisplay(); filterDoctors(); };
+  
+  async function loadDoctors() {
+    doctorsContainer.innerHTML = '<div class="skeleton-card"></div>'.repeat(4);
+    const { data, error } = await supabaseClient.from('doctors').select('*').eq('approved', true);
+    if(error) { doctorsContainer.innerHTML = `<div class="glass-card" style="padding:2rem; text-align:center;">❌ Error: ${error.message}</div>`; return; }
+    if(!data || data.length === 0) { doctorsContainer.innerHTML = '<div class="glass-card" style="padding:2rem; text-align:center;">🏥 No doctors found.</div>'; return; }
+    allDoctors = data;
+    filterDoctors();
+  }
+  
+  function renderDoctors(doctors) {
+    if(!doctors || doctors.length === 0) {
+      doctorsContainer.innerHTML = '<div class="glass-card" style="padding:2rem; text-align:center;">🔍 No doctors match your search.</div>';
+      return;
+    }
+    doctorsContainer.innerHTML = doctors.map(doctor => `
+      <div class="doctor-card glass-card" style="padding: 1.5rem;">
+        <img src="${doctor.image || 'https://randomuser.me/api/portraits/med.jpg'}" alt="${doctor.name}" loading="lazy" style="width:100%; height:180px; object-fit:cover; border-radius:20px;">
+        <h3 style="margin-top:1rem;">${doctor.name}</h3>
+        <p style="color:#2ba0c4;">${doctor.specialty}</p>
+        <p>⭐ ${doctor.rating || 4.5} • ${doctor.experience || 0}+ years</p>
+        <p>🏥 ${doctor.hospital || 'Private Practice'}</p>
+        <p><strong>₹${doctor.fees || 500}</strong> per visit</p>
+        <p>📞 ${doctor.phone || 'Contact available'}</p>
+        <a href="doctor-details.html?dr=${doctor.slug}" class="btn-primary" style="display:inline-block; margin-top:12px; text-decoration:none;">View Profile →</a>
+      </div>
+    `).join('');
+  }
+  
+  function filterDoctors() {
+    const searchTerm = searchInput.value.toLowerCase();
+    const city = cityFilter.value;
+    const filtered = allDoctors.filter(doc => {
+      if (searchTerm && !doc.name.toLowerCase().includes(searchTerm)) return false;
+      if (city && doc.city !== city) return false;
+      if (selectedSpecialty && doc.specialty !== selectedSpecialty) return false;
+      return true;
+    });
+    renderDoctors(filtered);
+    updateSelectedFiltersDisplay();
+  }
+  
+  function applyURLParams() {
+    const params = new URLSearchParams(window.location.search);
+    if(params.get('name')) searchInput.value = params.get('name');
+    if(params.get('city')) cityFilter.value = params.get('city');
+    if(params.get('specialty')) selectedSpecialty = params.get('specialty');
+    filterDoctors();
+  }
+  
+  searchInput.addEventListener('input', filterDoctors);
+  cityFilter.addEventListener('change', filterDoctors);
+  specialtySearch.addEventListener('input', filterAndDisplaySpecialties);
+  
+  document.addEventListener('click', function(e) {
+    if (!specialtySearch.contains(e.target) && !specialtyButtonsContainer.contains(e.target)) {
+      if (specialtySearch.value === '') specialtyButtonsContainer.classList.remove('visible');
+    }
+  });
+  
+  resetBtn.addEventListener('click', () => { 
+    searchInput.value = ''; cityFilter.value = ''; selectedSpecialty = '';
+    specialtySearch.value = ''; specialtyButtonsContainer.classList.remove('visible');
+    updateSelectedFiltersDisplay(); filterDoctors(); 
+  });
+  
+  document.getElementById('darkModeToggle')?.addEventListener('click', () => document.body.classList.toggle('dark'));
+  document.getElementById('menuIcon')?.addEventListener('click', () => document.getElementById('navLinks').classList.toggle('active'));
+  
+  async function checkAuth() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const loginBtn = document.getElementById('loginNavBtn');
+    const dashboardBtn = document.getElementById('dashboardNavBtn');
+    if(user) { loginBtn.style.display = 'none'; dashboardBtn.style.display = 'inline-block'; }
+    else { loginBtn.style.display = 'inline-block'; dashboardBtn.style.display = 'none'; }
+  }
+  
+  checkAuth();
+  loadSpecialties();
+  loadDoctors();
+  applyURLParams();
+</script>
+</body>
+</html>

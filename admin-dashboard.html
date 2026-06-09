@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4D8GL6D');</script>
+  <!-- End Google Tag Manager -->
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Indexly</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4D8GL6D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">👑 Indexly Admin</div>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <button id="logoutBtn" class="btn-outline">Logout</button>
+      <button id="darkModeToggle" class="btn-outline">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<div class="dashboard-container">
+  <div class="sidebar">
+    <a href="#" class="active" onclick="showSection('pending')">⏳ Pending Approvals</a>
+    <a href="#" onclick="showSection('allItems')">📦 All Items</a>
+    <a href="#" onclick="showSection('categories')">📁 Categories</a>
+    <a href="#" onclick="showSection('users')">👥 Users</a>
+  </div>
+  <div class="main-content">
+    <div class="stats-grid">
+      <div class="stat-card glass-card"><div class="stat-number" id="totalItems">0</div><div>Total Items</div></div>
+      <div class="stat-card glass-card"><div class="stat-number" id="pendingItems">0</div><div>Pending Approval</div></div>
+      <div class="stat-card glass-card"><div class="stat-number" id="totalUsers">0</div><div>Users</div></div>
+    </div>
+    
+    <div id="pendingSection"><h2>⏳ Pending Approvals</h2><div id="pendingList"></div></div>
+    <div id="allItemsSection" style="display:none;"><h2>📦 All Items</h2><input type="text" id="searchItems" placeholder="Search..." style="width:100%; padding:10px; margin-bottom:1rem; border-radius:40px;"><div id="allItemsList"></div></div>
+    <div id="categoriesSection" style="display:none;"><h2>📁 Categories</h2><div id="categoriesList"></div></div>
+    <div id="usersSection" style="display:none;"><h2>👥 Users</h2><div id="usersList"></div></div>
+  </div>
+</div>
+
+<script>
+  async function requireAdminCheck() { if(!await requireAdmin()) return false; loadDashboard(); return true; }
+  
+  async function loadDashboard() { loadStats(); loadPending(); loadAllItems(); loadCategories(); loadUsers(); }
+  
+  async function loadStats() { 
+    const { count: total } = await supabaseClient.from('items').select('*', { count: 'exact', head: true }); 
+    const { count: pending } = await supabaseClient.from('items').select('*', { count: 'exact', head: true }).eq('approved', false); 
+    const { data: users } = await supabaseClient.auth.admin.listUsers();
+    document.getElementById('totalItems').innerText = total || 0; 
+    document.getElementById('pendingItems').innerText = pending || 0; 
+    document.getElementById('totalUsers').innerText = users?.users?.length || 0; 
+  }
+  
+  async function loadPending() { 
+    const { data } = await supabaseClient.from('items').select('*, categories(name, icon)').eq('approved', false).order('created_at', { ascending: false }); 
+    const container = document.getElementById('pendingList'); 
+    if(!data || data.length === 0) { container.innerHTML = '<p>✅ No pending approvals</p>'; return; } 
+    container.innerHTML = data.map(item => `
+      <div class="glass-card" style="margin-bottom:1rem; padding:1rem;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+          <div>
+            <h3>${item.categories?.icon || '📌'} ${item.name || item.news_title || item.scheme_name}</h3>
+            <p>${item.categories?.name || 'Unknown'} • ${item.city || 'N/A'}</p>
+            <p>📧 ${item.email}</p>
+            <small>Submitted: ${new Date(item.created_at).toLocaleString()}</small>
+          </div>
+          <div>
+            <button onclick="approveItem(${item.id})" class="btn-success">✅ Approve</button>
+            <button onclick="rejectItem(${item.id})" class="btn-danger">❌ Reject</button>
+          </div>
+        </div>
+      </div>
+    `).join(''); 
+  }
+  
+  window.approveItem = async (id) => { await supabaseClient.from('items').update({ approved: true }).eq('id', id); loadDashboard(); };
+  window.rejectItem = async (id) => { if(confirm('Delete this item?')) { await supabaseClient.from('items').delete().eq('id', id); loadDashboard(); } };
+  window.deleteItem = async (id) => { if(confirm('Permanently delete?')) { await supabaseClient.from('items').delete().eq('id', id); loadAllItems(); loadStats(); } };
+  
+  async function loadAllItems() { 
+    const { data } = await supabaseClient.from('items').select('*, categories(name, icon)').order('created_at', { ascending: false }); 
+    const container = document.getElementById('allItemsList'); 
+    if(!data || data.length === 0) { container.innerHTML = '<p>No items</p>'; return; } 
+    container.innerHTML = `<table class="data-table"><thead><tr><th>Name</th><th>Category</th><th>City</th><th>Status</th><th>Action</th></tr></thead><tbody>${data.map(item => `<tr><td>${item.name || item.news_title || item.scheme_name}</td><td>${item.categories?.name || 'Unknown'}</td><td>${item.city || 'N/A'}</td><td>${item.approved ? '✅ Approved' : '⏳ Pending'}</td><td><button onclick="deleteItem(${item.id})" class="btn-danger">Delete</button></td></tr>`).join('')}</tbody></table>`; }
+  
+  async function loadCategories() {
+    const { data } = await supabaseClient.from('categories').select('*');
+    const container = document.getElementById('categoriesList');
+    container.innerHTML = `<table class="data-table"><thead><tr><th>Icon</th><th>Name</th><th>Slug</th><th>Status</th></tr></thead><tbody>${data.map(cat => `<tr><td>${cat.icon || '📌'}</td><td>${cat.name}</td><td>${cat.slug}</td><td>${cat.active ? '✅ Active' : '❌ Inactive'}</td></tr>`).join('')}</tbody></table>`;
+  }
+  
+  async function loadUsers() { 
+    const { data } = await supabaseClient.auth.admin.listUsers(); 
+    const container = document.getElementById('usersList'); 
+    if(!data?.users?.length) { container.innerHTML = '<p>No users</p>'; return; } 
+    container.innerHTML = `<table class="data-table"><thead><tr><th>Email</th><th>Created</th></tr></thead><tbody>${data.users.map(u => `<tr><td>${u.email}</td><td>${new Date(u.created_at).toLocaleDateString()}</td></tr>`).join('')}</tbody></table>`; }
+  
+  document.getElementById('searchItems')?.addEventListener('input', async (e) => { 
+    const term = e.target.value.toLowerCase(); 
+    const { data } = await supabaseClient.from('items').select('*, categories(name)').ilike('name', `%${term}%`); 
+    const container = document.getElementById('allItemsList'); 
+    if(!data || data.length === 0) { container.innerHTML = '<p>No items</p>'; return; } 
+    container.innerHTML = data.map(item => `<div style="border-bottom:1px solid #ddd; padding:12px;"><strong>${item.name || item.news_title || item.scheme_name}</strong> - ${item.categories?.name} <button onclick="deleteItem(${item.id})" class="btn-danger" style="float:right;">Delete</button></div>`).join(''); 
+  });
+  
+  window.showSection = (section) => { 
+    document.getElementById('pendingSection').style.display = section === 'pending' ? 'block' : 'none'; 
+    document.getElementById('allItemsSection').style.display = section === 'allItems' ? 'block' : 'none'; 
+    document.getElementById('categoriesSection').style.display = section === 'categories' ? 'block' : 'none'; 
+    document.getElementById('usersSection').style.display = section === 'users' ? 'block' : 'none'; 
+  };
+  
+  document.getElementById('darkModeToggle')?.addEventListener('click', () => document.body.classList.toggle('dark'));
+  document.getElementById('logoutBtn')?.addEventListener('click', async () => { await supabaseClient.auth.signOut(); window.location.href = 'admin-login.html'; });
+  requireAdminCheck();
+</script>
+</body>
+</html>

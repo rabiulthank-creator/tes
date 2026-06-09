@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4D8GL6D');</script>
+  <!-- End Google Tag Manager -->
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Category | Indexly</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <style>
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem; padding: 1rem; background: rgba(255,255,255,0.5); border-radius: 20px; }
+    .filter-bar input, .filter-bar select { padding: 10px 16px; border-radius: 40px; border: 1px solid #ccc; flex: 1; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
+    .category-hero { background: linear-gradient(135deg, #0b4f6c, #2ba0c4); color: white; padding: 2rem; border-radius: 30px; margin-bottom: 2rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4D8GL6D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">🏥 Indexly</div>
+    <div class="menu-icon" id="menuIcon">☰</div>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="category.html?type=doctor">Doctors</a>
+      <a href="category.html?type=hotel">Hotels</a>
+      <a href="category.html?type=restaurant">Restaurants</a>
+      <a href="category.html?type=news">News</a>
+      <a href="category.html?type=scheme">Schemes</a>
+      <a href="login.html" id="loginNavBtn" class="btn-outline">Login</a>
+      <a href="dashboard.html" id="dashboardNavBtn" style="display:none;">Dashboard</a>
+      <button id="darkModeToggle" class="btn-outline">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container" style="padding: 2rem 1rem;">
+  <div id="categoryHeader" class="category-hero">
+    <h1 id="categoryTitle">Loading...</h1>
+    <p id="categoryDesc">Browse and discover the best options</p>
+  </div>
+  
+  <div class="filter-bar">
+    <input type="text" id="searchInput" placeholder="🔍 Search by name...">
+    <select id="cityFilter">
+      <option value="">All Cities</option>
+    </select>
+    <button id="resetBtn" class="btn-outline">Reset</button>
+  </div>
+  
+  <div id="itemsContainer" class="grid-4">
+    <div class="skeleton-card"></div><div class="skeleton-card"></div>
+    <div class="skeleton-card"></div><div class="skeleton-card"></div>
+  </div>
+</main>
+
+<script>
+  let currentType = '';
+  let allItems = [];
+  let tableName = '';
+  let categoryInfo = {};
+  
+  const categoryMap = {
+    doctor: { table: 'doctors', title: 'Doctors', icon: '👨‍⚕️', titleField: 'name', cityField: 'city', desc: 'Find the best doctors in your area' },
+    hotel: { table: 'hotels', title: 'Hotels', icon: '🏨', titleField: 'name', cityField: 'city', desc: 'Discover comfortable stays and luxury hotels' },
+    restaurant: { table: 'restaurants', title: 'Restaurants', icon: '🍽️', titleField: 'name', cityField: 'city', desc: 'Explore top-rated restaurants and cuisines' },
+    news: { table: 'trending_news', title: 'Trending News', icon: '📰', titleField: 'title', cityField: null, desc: 'Stay updated with latest news' },
+    scheme: { table: 'government_schemes', title: 'Government Schemes', icon: '🏛️', titleField: 'name', cityField: null, desc: 'Find and apply for government schemes' }
+  };
+  
+  function getTypeFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('type');
+  }
+  
+  async function loadCategoryInfo() {
+    currentType = getTypeFromURL();
+    
+    if (!currentType || !categoryMap[currentType]) {
+      window.location.href = 'index.html';
+      return;
+    }
+    
+    categoryInfo = categoryMap[currentType];
+    tableName = categoryInfo.table;
+    
+    document.getElementById('categoryTitle').innerHTML = `${categoryInfo.icon} ${categoryInfo.title}`;
+    document.getElementById('categoryDesc').innerText = categoryInfo.desc;
+    document.title = `${categoryInfo.title} | Indexly`;
+    
+    await loadItems();
+  }
+  
+  async function loadItems() {
+    const { data, error } = await supabaseClient
+      .from(tableName)
+      .select('*')
+      .eq('approved', true)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error loading items:', error);
+      return;
+    }
+    
+    allItems = data || [];
+    
+    if (categoryInfo.cityField) {
+      const cities = [...new Set(allItems.filter(i => i[categoryInfo.cityField]).map(i => i[categoryInfo.cityField]))];
+      const cityFilter = document.getElementById('cityFilter');
+      cityFilter.innerHTML = '<option value="">All Cities</option>' + 
+        cities.map(city => `<option value="${city}">${city}</option>`).join('');
+    }
+    
+    filterItems();
+  }
+  
+  function renderItemCard(item) {
+    const title = item[categoryInfo.titleField] || 'Untitled';
+    const image = item.image || (currentType === 'doctor' ? 'https://randomuser.me/api/portraits/med.jpg' : 
+                                  currentType === 'hotel' ? 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400' :
+                                  currentType === 'restaurant' ? 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' :
+                                  'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400');
+    // সঠিক লিংক তৈরি করা হয়েছে
+    const detailsLink = `item-details.html?type=${currentType}&id=${item.id}`;
+    
+    if (currentType === 'doctor') {
+      return `
+        <div class="item-card glass-card" style="padding:1rem;">
+          <span class="category-badge">👨‍⚕️ Doctor</span>
+          <img src="${image}" style="height:160px; width:100%; object-fit:cover; border-radius:16px;" alt="${title}">
+          <div class="item-title">${title}</div>
+          <div class="item-meta">${item.specialty || 'General'} • ${item.city || 'N/A'}</div>
+          <div class="item-meta"><span class="rating">⭐ ${item.rating || 'New'}</span> <span>💰 ₹${item.fees || 500}</span></div>
+          <a href="${detailsLink}" class="btn-primary" style="display:block; text-align:center; margin-top:10px; padding:8px;">View Profile →</a>
+        </div>
+      `;
+    }
+    else if (currentType === 'hotel') {
+      return `
+        <div class="item-card glass-card" style="padding:1rem;">
+          <span class="category-badge">🏨 Hotel</span>
+          <img src="${image}" style="height:160px; width:100%; object-fit:cover; border-radius:16px;" alt="${title}">
+          <div class="item-title">${title}</div>
+          <div class="item-meta">${item.city || 'N/A'}</div>
+          <div class="item-meta"><span class="rating">⭐ ${item.rating || 'New'}</span> <span>💰 ${item.price_range || 'Contact'}</span></div>
+          <a href="${detailsLink}" class="btn-primary" style="display:block; text-align:center; margin-top:10px; padding:8px;">View Details →</a>
+        </div>
+      `;
+    }
+    else if (currentType === 'restaurant') {
+      return `
+        <div class="item-card glass-card" style="padding:1rem;">
+          <span class="category-badge">🍽️ Restaurant</span>
+          <img src="${image}" style="height:160px; width:100%; object-fit:cover; border-radius:16px;" alt="${title}">
+          <div class="item-title">${title}</div>
+          <div class="item-meta">${item.cuisine_type || 'Multi-cuisine'} • ${item.city || 'N/A'}</div>
+          <div class="item-meta"><span class="rating">⭐ ${item.rating || 'New'}</span></div>
+          <a href="${detailsLink}" class="btn-primary" style="display:block; text-align:center; margin-top:10px; padding:8px;">View Details →</a>
+        </div>
+      `;
+    }
+    else if (currentType === 'news') {
+      return `
+        <div class="item-card glass-card" style="padding:1rem;">
+          <span class="category-badge">📰 News</span>
+          <div class="item-title">${title}</div>
+          <div class="item-meta">${item.source || 'Unknown Source'}</div>
+          <div class="item-meta">📅 ${new Date(item.published_date || item.created_at).toLocaleDateString()}</div>
+          <a href="${detailsLink}" class="btn-primary" style="display:block; text-align:center; margin-top:10px; padding:8px;">Read More →</a>
+        </div>
+      `;
+    }
+    else if (currentType === 'scheme') {
+      return `
+        <div class="item-card glass-card" style="padding:1rem;">
+          <span class="category-badge">🏛️ Govt Scheme</span>
+          <div class="item-title">${title}</div>
+          <div class="item-meta">${item.eligibility || 'Check eligibility'}</div>
+          <div class="item-meta">📅 Deadline: ${item.deadline ? new Date(item.deadline).toLocaleDateString() : 'Not specified'}</div>
+          <a href="${detailsLink}" class="btn-primary" style="display:block; text-align:center; margin-top:10px; padding:8px;">Apply Now →</a>
+        </div>
+      `;
+    }
+    return '';
+  }
+  
+  function filterItems() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const city = document.getElementById('cityFilter').value;
+    
+    const filtered = allItems.filter(item => {
+      const title = (item[categoryInfo.titleField] || '').toLowerCase();
+      if (searchTerm && !title.includes(searchTerm)) return false;
+      if (city && categoryInfo.cityField && item[categoryInfo.cityField] !== city) return false;
+      return true;
+    });
+    
+    const container = document.getElementById('itemsContainer');
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="glass-card" style="padding:2rem; text-align:center; grid-column:1/-1;">No items found.</div>';
+    } else {
+      container.innerHTML = filtered.map(item => renderItemCard(item)).join('');
+    }
+  }
+  
+  document.getElementById('searchInput')?.addEventListener('input', filterItems);
+  document.getElementById('cityFilter')?.addEventListener('change', filterItems);
+  document.getElementById('resetBtn')?.addEventListener('click', () => {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('cityFilter').value = '';
+    filterItems();
+  });
+  
+  document.getElementById('darkModeToggle')?.addEventListener('click', () => document.body.classList.toggle('dark'));
+  document.getElementById('menuIcon')?.addEventListener('click', () => document.getElementById('navLinks').classList.toggle('active'));
+  
+  async function checkAuth() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const loginBtn = document.getElementById('loginNavBtn');
+    const dashboardBtn = document.getElementById('dashboardNavBtn');
+    if(user) { loginBtn.style.display = 'none'; dashboardBtn.style.display = 'inline-block'; }
+    else { loginBtn.style.display = 'inline-block'; dashboardBtn.style.display = 'none'; }
+  }
+  
+  checkAuth();
+  loadCategoryInfo();
+</script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4D8GL6D');</script>
+  <!-- End Google Tag Manager -->
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doctor Profile | Indexly</title>
+  <meta name="description" content="View doctor profile, book appointment, and read patient reviews.">
+  <link rel="canonical" href="https://indexly.online/doctor-details.html">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabase.js"></script>
+  <style>
+    .doctor-profile-image {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid #2ba0c4;
+    }
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      font-size: 1.2rem;
+      color: #2ba0c4;
+    }
+    .error-message {
+      text-align: center;
+      padding: 3rem;
+    }
+    .clinic-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .gallery-img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      border: 2px solid transparent;
+    }
+    .gallery-img:hover {
+      transform: scale(1.05);
+      border-color: #2ba0c4;
+    }
+    .lightbox {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.95);
+      z-index: 3000;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+    }
+    .lightbox.active {
+      display: flex;
+    }
+    .lightbox img {
+      max-width: 90%;
+      max-height: 90%;
+      border-radius: 8px;
+    }
+    .lightbox .close {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      color: white;
+      font-size: 40px;
+      cursor: pointer;
+    }
+    .call-btn {
+      background: linear-gradient(95deg, #25D366, #128C7E);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 10px;
+    }
+    .call-btn:hover {
+      transform: scale(1.02);
+    }
+    .info-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    .info-icon {
+      font-size: 1.2rem;
+      min-width: 30px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4D8GL6D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="logo">🏥 Indexly</div>
+    <div class="menu-icon" id="menuIcon">☰</div>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="doctors.html">Doctors</a>
+      <a href="login.html" id="loginNavBtn" class="btn-outline">Login</a>
+      <a href="dashboard.html" id="dashboardNavBtn" style="display:none;">Dashboard</a>
+      <button id="darkModeToggle" class="btn-outline">🌙</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container" style="padding: 2rem 1rem;">
+  <div id="doctorProfileContainer">
+    <div class="loading">🔄 Loading doctor information...</div>
+  </div>
+</main>
+
+<!-- Lightbox for gallery -->
+<div id="lightbox" class="lightbox" onclick="closeLightbox()">
+  <div class="close">&times;</div>
+  <img id="lightboxImg" src="">
+</div>
+
+<!-- Appointment Modal -->
+<div id="appointmentModal" class="modal">
+  <div class="modal-content">
+    <h2>📅 Book Appointment</h2>
+    <form id="appointmentForm">
+      <div class="form-group">
+        <label>Patient Name *</label>
+        <input type="text" id="patientName" required>
+      </div>
+      <div class="form-group">
+        <label>Phone Number *</label>
+        <input type="tel" id="patientPhone" required>
+      </div>
+      <div class="form-group">
+        <label>Preferred Date *</label>
+        <input type="date" id="appointmentDate" required>
+      </div>
+      <div class="form-group">
+        <label>Preferred Time *</label>
+        <select id="appointmentTime">
+          <option>10:00 AM</option><option>11:00 AM</option>
+          <option>12:00 PM</option><option>02:00 PM</option>
+          <option>03:00 PM</option><option>04:00 PM</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Symptoms (Optional)</label>
+        <textarea id="symptoms" rows="3"></textarea>
+      </div>
+      <button type="submit" class="btn-primary">Confirm Booking</button>
+      <button type="button" onclick="closeModal()" class="btn-outline">Cancel</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  let currentDoctor = null;
+
+  function getParameterByName(name, url = window.location.href) {
+    name = name.replace(/[\[\]]/g, '\\$&');
+    const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
+    const results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+  }
+
+  function openLightbox(imageUrl) {
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    lightboxImg.src = imageUrl;
+    lightbox.classList.add('active');
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('active');
+  }
+
+  async function loadDoctor() {
+    const container = document.getElementById('doctorProfileContainer');
+    const doctorSlug = getParameterByName('dr');
+    
+    console.log('Loading doctor with slug:', doctorSlug);
+    
+    if (!doctorSlug) {
+      container.innerHTML = `<div class="error-message glass-card" style="padding:2rem; text-align:center;">
+        ❌ No doctor specified.<br><br>
+        <a href="doctors.html" class="btn-primary">Browse Doctors</a>
+      </div>`;
+      return;
+    }
+    
+    container.innerHTML = '<div class="loading">🔄 Loading doctor information...</div>';
+    
+    try {
+      const { data, error } = await supabaseClient
+        .from('doctors')
+        .select('*')
+        .eq('slug', doctorSlug)
+        .maybeSingle();
+      
+      if (error || !data) {
+        console.error('Doctor not found:', error);
+        container.innerHTML = `<div class="error-message glass-card" style="padding:2rem; text-align:center;">
+          ❌ Doctor not found.<br><br>
+          <a href="doctors.html" class="btn-primary">Browse All Doctors</a>
+        </div>`;
+        return;
+      }
+      
+      currentDoctor = data;
+      renderDoctorProfile(data);
+      loadReviews(data.id);
+      document.title = `Dr. ${data.name} - ${data.specialty} | Indexly`;
+      
+    } catch (err) {
+      console.error('Loading error:', err);
+      container.innerHTML = `<div class="error-message glass-card" style="padding:2rem; text-align:center;">
+        ❌ Error loading profile. Please try again later.
+      </div>`;
+    }
+  }
+  
+  function renderDoctorProfile(doc) {
+    const container = document.getElementById('doctorProfileContainer');
+    const phoneNumber = doc.phone || 'Not available';
+    const profileImage = doc.image || 'https://randomuser.me/api/portraits/med.jpg';
+    const clinicImages = doc.clinic_images || [];
+    
+    container.innerHTML = `
+      <div class="glass-card" style="padding: 2rem;">
+        <!-- Doctor Header Section -->
+        <div style="display: flex; flex-wrap: wrap; gap: 2rem; margin-bottom: 2rem;">
+          <div style="text-align: center;">
+            <img src="${profileImage}" alt="${doc.name}" class="doctor-profile-image">
+          </div>
+          <div style="flex: 1;">
+            <h1>Dr. ${doc.name}</h1>
+            <p style="font-size: 1.2rem; color: #2ba0c4; margin: 5px 0;">${doc.specialty}</p>
+            
+            <div class="info-row">
+              <span class="info-icon">⭐</span>
+              <span>${doc.rating || 4.5} (120+ reviews)</span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">📅</span>
+              <span>${doc.experience || 0}+ years experience</span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">🏥</span>
+              <span>${doc.hospital || 'Private Practice'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">📍</span>
+              <span>${doc.city || 'Multiple Locations'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">💰</span>
+              <span><strong>₹${doc.fees}</strong> per consultation</span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">📞</span>
+              <span>${phoneNumber}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-icon">✅</span>
+              <span>${doc.available ? 'Available for appointments' : 'Currently unavailable'}</span>
+            </div>
+            
+            <div style="margin-top: 1.5rem;">
+              ${doc.phone && doc.phone !== 'Not available' ? `<a href="tel:${doc.phone}" class="btn-primary call-btn">📞 Call Now (${doc.phone})</a>` : ''}
+              <button onclick="openBookingModal()" class="btn-primary">📅 Book Appointment →</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- About Doctor -->
+        ${doc.about ? `
+        <div style="margin-top: 2rem;">
+          <h3>📋 About Doctor</h3>
+          <p style="line-height: 1.6;">${doc.about}</p>
+        </div>
+        ` : ''}
+        
+        <!-- Qualifications -->
+        <div style="margin-top: 2rem;">
+          <h3>🎓 Qualifications</h3>
+          <ul style="margin-left: 1.5rem; line-height: 1.8;">
+            <li>MBBS - Recognized Medical College</li>
+            <li>MD - ${doc.specialty}</li>
+            <li>Fellowship in Advanced Care</li>
+          </ul>
+        </div>
+        
+        <!-- Clinic Information -->
+        <div style="margin-top: 2rem;">
+          <h3>🏥 Clinic Information</h3>
+          <p><strong>Name:</strong> ${doc.hospital || 'Not specified'}</p>
+          <p><strong>Address:</strong> ${doc.clinic_address || doc.city || 'Not specified'}</p>
+        </div>
+        
+        <!-- Clinic Gallery -->
+        ${clinicImages.length > 0 ? `
+        <div style="margin-top: 2rem;">
+          <h3>📸 Clinic Gallery</h3>
+          <div class="clinic-gallery">
+            ${clinicImages.map(img => `
+              <img src="${img}" alt="Clinic image" class="gallery-img" onclick="openLightbox('${img}')">
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+        
+        <!-- Consultation Timings -->
+        <div style="margin-top: 2rem;">
+          <h3>🕐 Consultation Timings</h3>
+          <p>Monday - Saturday: 10:00 AM - 6:00 PM</p>
+          <p>Sunday: Closed</p>
+        </div>
+        
+        <!-- Reviews Section -->
+        <div style="margin-top: 2rem;" id="reviewsSection">
+          <h3>⭐ Patient Reviews</h3>
+          <div id="reviewsList">Loading reviews...</div>
+          
+          <!-- Write Review Form -->
+          <div style="margin-top: 1.5rem; background: rgba(43,160,196,0.05); padding: 1.5rem; border-radius: 20px;">
+            <h4>✍️ Write a Review</h4>
+            <textarea id="reviewText" placeholder="Share your experience with this doctor..." rows="3" 
+                      style="width:100%; border-radius:16px; padding:12px; margin-bottom:8px; border: 1px solid #ccc;"></textarea>
+            <select id="reviewRating" style="padding:8px; border-radius:8px; border: 1px solid #ccc;">
+              <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+              <option value="4">⭐⭐⭐⭐ Good</option>
+              <option value="3">⭐⭐⭐ Average</option>
+              <option value="2">⭐⭐ Poor</option>
+              <option value="1">⭐ Very Poor</option>
+            </select>
+            <button onclick="submitReview()" class="btn-primary" style="margin-left: 8px;">
+              Submit Review
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  async function loadReviews(doctorId) {
+    const { data, error } = await supabaseClient
+      .from('reviews')
+      .select('*')
+      .eq('doctor_id', doctorId)
+      .order('created_at', { ascending: false });
+    
+    const reviewsDiv = document.getElementById('reviewsList');
+    if (error || !data || data.length === 0) {
+      reviewsDiv.innerHTML = '<p style="text-align: center; padding: 1rem;">No reviews yet. Be the first to review!</p>';
+      return;
+    }
+    
+    reviewsDiv.innerHTML = data.map(review => `
+      <div class="glass-card" style="padding: 1rem; margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong>${review.user_name}</strong>
+          <span style="background: #2ba0c4; color: white; padding: 2px 8px; border-radius: 20px;">⭐ ${review.rating}</span>
+        </div>
+        <p style="margin-top: 8px; line-height: 1.5;">${review.comment}</p>
+        <small style="color: #666;">${new Date(review.created_at).toLocaleDateString()}</small>
+      </div>
+    `).join('');
+  }
+  
+  window.submitReview = async () => {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) {
+      alert('Please login to submit a review');
+      window.location.href = 'login.html';
+      return;
+    }
+    
+    const reviewText = document.getElementById('reviewText').value;
+    const rating = document.getElementById('reviewRating').value;
+    
+    if (!reviewText.trim()) {
+      alert('Please write a review before submitting');
+      return;
+    }
+    
+    const { error } = await supabaseClient.from('reviews').insert({
+      doctor_id: currentDoctor.id,
+      user_id: user.id,
+      user_name: user.email.split('@')[0],
+      rating: parseInt(rating),
+      comment: reviewText,
+      created_at: new Date()
+    });
+    
+    if (error) {
+      alert('Error submitting review: ' + error.message);
+    } else {
+      alert('✅ Review submitted successfully! Thank you for your feedback.');
+      document.getElementById('reviewText').value = '';
+      loadReviews(currentDoctor.id);
+    }
+  };
+  
+  window.openBookingModal = async () => {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) {
+      alert('Please login to book appointment');
+      window.location.href = 'login.html';
+      return;
+    }
+    document.getElementById('appointmentModal').classList.add('active');
+  };
+  
+  window.closeModal = () => {
+    document.getElementById('appointmentModal').classList.remove('active');
+  };
+  
+  document.getElementById('appointmentForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) {
+      alert('Please login to book appointment');
+      return;
+    }
+    
+    const appointment = {
+      doctor_id: currentDoctor.id,
+      user_id: user.id,
+      patient_name: document.getElementById('patientName').value,
+      patient_phone: document.getElementById('patientPhone').value,
+      appointment_date: document.getElementById('appointmentDate').value + ' ' + document.getElementById('appointmentTime').value,
+      symptoms: document.getElementById('symptoms').value,
+      status: 'pending',
+      created_at: new Date()
+    };
+    
+    const { error } = await supabaseClient.from('appointments').insert(appointment);
+    if (error) {
+      alert('Booking failed: ' + error.message);
+    } else {
+      alert('✅ Appointment booked successfully! We will confirm via SMS.');
+      closeModal();
+      document.getElementById('appointmentForm').reset();
+    }
+  });
+  
+  async function checkAuth() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    const loginBtn = document.getElementById('loginNavBtn');
+    const dashboardBtn = document.getElementById('dashboardNavBtn');
+    if(user) { 
+      loginBtn.style.display = 'none'; 
+      dashboardBtn.style.display = 'inline-block'; 
+    } else { 
+      loginBtn.style.display = 'inline-block'; 
+      dashboardBtn.style.display = 'none'; 
+    }
+  }
+  
+  // Mobile menu
+  document.getElementById('menuIcon')?.addEventListener('click', () => {
+    document.getElementById('navLinks').classList.toggle('active');
+  });
+  
+  // Dark mode toggle
+  document.getElementById('darkModeToggle')?.addEventListener('click', () => {
+    document.body.classList.toggle('dark');
+  });
+  
+  checkAuth();
+  loadDoctor();
+</script>
+</body>
+</html>
