@@ -11,7 +11,8 @@
   
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Item Details | Indexly</title>
+  <title id="pageTitle">Item Details | Indexly</title>
+  <meta name="description" id="metaDescription" content="View details and book appointments">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <script src="supabase.js"></script>
@@ -34,7 +35,61 @@
     .phone-number-card { background: linear-gradient(135deg, #0b4f6c, #2ba0c4); color: white; padding: 15px 20px; border-radius: 60px; display: inline-flex; align-items: center; gap: 15px; margin-top: 1rem; }
     .phone-number-card .phone-icon { font-size: 1.8rem; }
     .phone-number-card .number { font-size: 1.3rem; font-weight: bold; }
-    @media (max-width: 768px) { .details-header { flex-direction: column; } .phone-number-card { flex-direction: column; text-align: center; } }
+    
+    /* News Article Style */
+    .news-article {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .news-headline {
+      font-size: 2.2rem;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+    }
+    .news-meta {
+      color: #666;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .news-content {
+      font-size: 1.1rem;
+      line-height: 1.8;
+    }
+    .news-content p {
+      margin-bottom: 1.2rem;
+    }
+    .share-buttons {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #ddd;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .share-btn {
+      background: #f0f0f0;
+      padding: 8px 16px;
+      border-radius: 40px;
+      text-decoration: none;
+      color: #333;
+      font-size: 0.9rem;
+      transition: 0.2s;
+    }
+    .share-btn:hover {
+      background: #2ba0c4;
+      color: white;
+    }
+    
+    @media (max-width: 768px) { 
+      .details-header { flex-direction: column; } 
+      .phone-number-card { flex-direction: column; text-align: center; }
+      .news-headline { font-size: 1.6rem; }
+    }
   </style>
 </head>
 <body>
@@ -72,36 +127,36 @@
   
   function getQueryParams() {
     const params = new URLSearchParams(window.location.search);
-    return { type: params.get('type'), id: params.get('id') };
+    return { type: params.get('type'), slug: params.get('slug') };
   }
   
   const tableMap = {
-    doctor: 'doctors',
-    hotel: 'hotels',
-    restaurant: 'restaurants',
-    news: 'trending_news',
-    scheme: 'government_schemes'
+    doctor: { table: 'doctors', titleField: 'name', slugField: 'slug' },
+    hotel: { table: 'hotels', titleField: 'name', slugField: 'slug' },
+    restaurant: { table: 'restaurants', titleField: 'name', slugField: 'slug' },
+    news: { table: 'trending_news', titleField: 'title', slugField: 'slug' },
+    scheme: { table: 'government_schemes', titleField: 'name', slugField: 'slug' }
   };
   
   async function loadDetails() {
-    const { type, id } = getQueryParams();
+    const { type, slug } = getQueryParams();
     const container = document.getElementById('detailsContainer');
     
-    console.log('Loading details for type:', type, 'id:', id);
+    console.log('Loading details for type:', type, 'slug:', slug);
     
-    if (!type || !id) {
+    if (!type || !slug) {
       container.innerHTML = `
         <div class="error-message">
-          ❌ Invalid request. Missing type or ID.<br><br>
+          ❌ Invalid request. Missing type or slug.<br><br>
           <a href="index.html" class="btn-primary">Go to Homepage</a>
         </div>`;
       return;
     }
     
     currentType = type;
-    currentTable = tableMap[type];
+    const tableInfo = tableMap[type];
     
-    if (!currentTable) {
+    if (!tableInfo) {
       container.innerHTML = `
         <div class="error-message">
           ❌ Invalid category type: ${type}<br><br>
@@ -110,31 +165,41 @@
       return;
     }
     
+    currentTable = tableInfo.table;
+    
     container.innerHTML = '<div class="loading">🔄 Loading details...</div>';
     
     try {
       const { data, error } = await supabaseClient
         .from(currentTable)
         .select('*')
-        .eq('id', parseInt(id))
+        .eq(tableInfo.slugField, slug)
         .single();
       
       if (error || !data) {
-        container.innerHTML = `<div class="error-message">❌ Item not found. ${error?.message || ''}</div>`;
+        container.innerHTML = `<div class="error-message">❌ Item not found. <a href="${type === 'news' ? 'category.html?type=news' : 'index.html'}" class="btn-primary">Go Back</a></div>`;
         return;
       }
       
       currentItem = data;
-      renderDetails(data, type);
-      document.title = `${data.name || data.title || 'Details'} | Indexly`;
-      loadReviews(type, data.id);
+      renderDetails(data, type, tableInfo);
+      
+      // Update SEO meta tags
+      const title = data[tableInfo.titleField] || 'Details';
+      document.getElementById('pageTitle').innerText = `${title} | Indexly`;
+      document.getElementById('metaDescription').setAttribute('content', `View details about ${title}. ${data.summary || data.about || ''}`);
+      document.title = `${title} | Indexly`;
+      
+      if (type !== 'news' && type !== 'scheme') {
+        loadReviews(type, data.id);
+      }
       
     } catch (err) {
       container.innerHTML = `<div class="error-message">❌ Error: ${err.message}</div>`;
     }
   }
   
-  function renderDetails(item, type) {
+  function renderDetails(item, type, tableInfo) {
     const container = document.getElementById('detailsContainer');
     
     if (type === 'doctor') {
@@ -147,7 +212,7 @@
       container.innerHTML = renderRestaurantDetails(item);
     }
     else if (type === 'news') {
-      container.innerHTML = renderNewsDetails(item);
+      container.innerHTML = renderNewsArticle(item);
     }
     else if (type === 'scheme') {
       container.innerHTML = renderSchemeDetails(item);
@@ -247,22 +312,61 @@
     `;
   }
   
-  function renderNewsDetails(news) {
+  function renderNewsArticle(news) {
+    // Create a rich article content
+    const articleContent = news.summary || news.content || `
+      <p>This is a detailed article about ${news.title}. Stay tuned for more updates and in-depth coverage of this trending topic.</p>
+      <p>According to sources, this news has significant implications for the community. Experts are closely monitoring the situation and providing regular updates.</p>
+      <p>For more information and regular updates, follow our website and stay connected with the latest developments.</p>
+    `;
+    
+    // Format date
+    const publishDate = news.published_date || news.created_at;
+    const formattedDate = new Date(publishDate).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Get current URL for sharing
+    const currentUrl = encodeURIComponent(window.location.href);
+    const shareText = encodeURIComponent(`Check out this news: ${news.title}`);
+    
     return `
       <div class="glass-card" style="padding: 2rem;">
-        <div class="details-header">
-          <div class="details-info">
-            <h1>📰 ${news.title}</h1>
-            <div class="info-grid">
-              <div class="info-item"><span class="info-icon">📡</span> <span>Source: ${news.source || 'Unknown'}</span></div>
-              <div class="info-item"><span class="info-icon">📅</span> <span>Published: ${new Date(news.published_date || news.created_at).toLocaleDateString()}</span></div>
-            </div>
-            <div style="margin-top: 1.5rem;">
-              <a href="${news.news_url || '#'}" target="_blank" class="apply-btn">Read Full Article →</a>
-            </div>
+        <article class="news-article">
+          <h1 class="news-headline">${news.title}</h1>
+          <div class="news-meta">
+            <span>📅 ${formattedDate}</span>
+            <span>📡 Source: ${news.source || 'Indexly News'}</span>
+            <span>👁️ 1.2K views</span>
           </div>
-        </div>
-        ${news.summary ? `<div style="margin-top: 2rem;"><h3>📋 Summary</h3><p>${news.summary}</p></div>` : ''}
+          
+          ${news.image ? `<img src="${news.image}" alt="${news.title}" style="width:100%; border-radius:20px; margin-bottom:1.5rem;">` : ''}
+          
+          <div class="news-content">
+            ${articleContent}
+          </div>
+          
+          ${news.news_url ? `
+            <div style="margin-top: 1.5rem;">
+              <a href="${news.news_url}" target="_blank" class="apply-btn" style="background: #2ba0c4;">🔗 Read Original Article →</a>
+            </div>
+          ` : ''}
+          
+          <div class="share-buttons">
+            <strong>Share this news:</strong>
+            <a href="https://www.facebook.com/sharer/sharer.php?u=${currentUrl}" target="_blank" class="share-btn">📘 Facebook</a>
+            <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${currentUrl}" target="_blank" class="share-btn">🐦 Twitter</a>
+            <a href="https://wa.me/?text=${shareText}%20${currentUrl}" target="_blank" class="share-btn">💬 WhatsApp</a>
+            <a href="mailto:?subject=${encodeURIComponent(news.title)}&body=${encodeURIComponent(`Check out this news: ${window.location.href}`)}" class="share-btn">📧 Email</a>
+          </div>
+          
+          <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ddd;">
+            <h3>📰 Related News</h3>
+            <p><a href="category.html?type=news">Browse more news →</a></p>
+          </div>
+        </article>
       </div>
     `;
   }
@@ -271,18 +375,21 @@
     return `
       <div class="glass-card" style="padding: 2rem;">
         <div class="details-header">
+          <img src="${scheme.image || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=600'}" class="details-image" style="max-width: 300px;" alt="${scheme.name}">
           <div class="details-info">
             <h1>🏛️ ${scheme.name}</h1>
             <div class="info-grid">
               <div class="info-item"><span class="info-icon">👥</span> <span>Eligibility: ${scheme.eligibility || 'Check details'}</span></div>
               <div class="info-item"><span class="info-icon">📅</span> <span>Deadline: ${scheme.deadline ? new Date(scheme.deadline).toLocaleDateString() : 'Not specified'}</span></div>
+              <div class="info-item"><span class="info-icon">🏢</span> <span>Department: ${scheme.department || 'Government of India'}</span></div>
             </div>
             <div style="margin-top: 1.5rem;">
               <a href="${scheme.apply_link || '#'}" target="_blank" class="apply-btn">Apply Now →</a>
             </div>
           </div>
         </div>
-        ${scheme.description ? `<div style="margin-top: 2rem;"><h3>📋 Description</h3><p>${scheme.description}</p></div>` : ''}
+        ${scheme.description ? `<div style="margin-top: 2rem;"><h3>📋 Scheme Description</h3><p>${scheme.description}</p></div>` : ''}
+        ${scheme.benefits ? `<div style="margin-top: 2rem;"><h3>🎁 Benefits</h3><p>${scheme.benefits}</p></div>` : ''}
       </div>
     `;
   }

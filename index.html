@@ -12,6 +12,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indexly | Doctors, Hotels, Restaurants, News & Govt Schemes</title>
+  <meta name="description" content="Find trusted doctors, hotels, restaurants, trending news, and government schemes all in one place.">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <script src="supabase.js"></script>
@@ -104,11 +105,11 @@
   darkToggle?.addEventListener('click', () => document.body.classList.toggle('dark'));
   
   const categories = [
-    { name: 'Doctors', type: 'doctor', table: 'doctors', icon: '👨‍⚕️', titleField: 'name', imageField: 'image', defaultImage: 'https://randomuser.me/api/portraits/med.jpg' },
-    { name: 'Hotels', type: 'hotel', table: 'hotels', icon: '🏨', titleField: 'name', imageField: 'image', defaultImage: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400' },
-    { name: 'Restaurants', type: 'restaurant', table: 'restaurants', icon: '🍽️', titleField: 'name', imageField: 'image', defaultImage: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400' },
-    { name: 'Trending News', type: 'news', table: 'trending_news', icon: '📰', titleField: 'title', imageField: 'image', defaultImage: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400' },
-    { name: 'Government Schemes', type: 'scheme', table: 'government_schemes', icon: '🏛️', titleField: 'name', imageField: 'image', defaultImage: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400' }
+    { name: 'Doctors', type: 'doctor', table: 'doctors', icon: '👨‍⚕️', titleField: 'name', slugField: 'slug' },
+    { name: 'Hotels', type: 'hotel', table: 'hotels', icon: '🏨', titleField: 'name', slugField: 'slug' },
+    { name: 'Restaurants', type: 'restaurant', table: 'restaurants', icon: '🍽️', titleField: 'name', slugField: 'slug' },
+    { name: 'Trending News', type: 'news', table: 'trending_news', icon: '📰', titleField: 'title', slugField: 'slug' },
+    { name: 'Government Schemes', type: 'scheme', table: 'government_schemes', icon: '🏛️', titleField: 'name', slugField: 'slug' }
   ];
   
   async function loadHomepage() {
@@ -159,9 +160,17 @@
   
   function renderItemCard(item, category) {
     const title = item[category.titleField] || 'Untitled';
-    const image = item[category.imageField] || category.defaultImage;
-    // সঠিক লিংক তৈরি করা হয়েছে
-    const detailsLink = `item-details.html?type=${category.type}&id=${item.id}`;
+    const slug = item[category.slugField] || 'item';
+    // SEO-friendly URL using slug
+    const detailsLink = `item-details.html?type=${category.type}&slug=${slug}`;
+    
+    // Default images
+    let defaultImage = 'https://randomuser.me/api/portraits/med.jpg';
+    if (category.type === 'hotel') defaultImage = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400';
+    if (category.type === 'restaurant') defaultImage = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400';
+    if (category.type === 'news' || category.type === 'scheme') defaultImage = 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400';
+    
+    const image = item.image || defaultImage;
     
     if (category.type === 'doctor') {
       return `
@@ -171,7 +180,7 @@
           <div class="item-title">${title}</div>
           <div class="item-meta">${item.specialty || 'General'} • ${item.city || 'N/A'}</div>
           <div class="item-meta"><span class="rating">⭐ ${item.rating || 'New'}</span> <span>💰 ₹${item.fees || 500}</span></div>
-          <a href="${detailsLink}" class="btn-outline" style="display:block; text-align:center; margin-top:10px; padding:8px;">View Details →</a>
+          <a href="${detailsLink}" class="btn-outline" style="display:block; text-align:center; margin-top:10px; padding:8px;">View Profile →</a>
         </div>
       `;
     }
